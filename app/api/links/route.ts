@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const userId = (session.user as any).id
 
-  const { membershipId, destinationUrl } = await req.json()
+  const { membershipId, destinationUrl, expiresAt } = await req.json()
 
   const membership = await prisma.affiliateMembership.findUnique({
     where: { id: membershipId },
@@ -26,12 +26,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Membership not approved" }, { status: 403 })
   }
 
+  const program = await prisma.program.findUnique({ where: { id: membership.programId } })
+
   const link = await prisma.link.create({
     data: {
       id: genId(),
       membershipId,
       code: generateCode(),
-      destinationUrl: destinationUrl || (await prisma.program.findUnique({ where: { id: membership.programId } }))!.websiteUrl,
+      destinationUrl: destinationUrl || program!.websiteUrl,
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     },
   })
 

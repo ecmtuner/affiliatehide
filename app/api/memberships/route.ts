@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { generateCode } from "@/lib/utils"
 import { customAlphabet } from "nanoid"
+import { emailNewApplication } from "@/lib/email"
 
 const genId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 25)
 
@@ -38,13 +39,18 @@ export async function POST(req: NextRequest) {
   const { programId } = await req.json()
   if (!programId) return NextResponse.json({ error: "Program ID required" }, { status: 400 })
 
-  const program = await prisma.program.findUnique({ where: { id: programId } })
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
+    include: { company: { select: { email: true, name: true } } },
+  })
   if (!program) return NextResponse.json({ error: "Program not found" }, { status: 404 })
 
   const existing = await prisma.affiliateMembership.findUnique({
     where: { affiliateId_programId: { affiliateId: userId, programId } },
   })
   if (existing) return NextResponse.json({ error: "Already applied" }, { status: 400 })
+
+  const affiliate = await prisma.user.findUnique({ where: { id: userId } })
 
   const status = program.autoApprove ? "approved" : "pending"
   const membership = await prisma.affiliateMembership.create({
@@ -67,6 +73,10 @@ export async function POST(req: NextRequest) {
       },
     })
   }
+
+  // Send email notification to company owner
+  const affiliateName = affiliate?.name ?? affiliate?.email ?? "An affiliate"
+  emailNewApplication(program.company.email, affiliateName).catch(() => {})
 
   return NextResponse.json(membership)
 }

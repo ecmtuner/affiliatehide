@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import Link from "next/link"
 import { DashboardLayout } from "@/components/DashboardLayout"
 
@@ -19,10 +19,25 @@ export default function ProgramDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
 
+  // Settings editing state
+  const [editingSettings, setEditingSettings] = useState(false)
+  const [settingsForm, setSettingsForm] = useState<any>({})
+  const [tiers, setTiers] = useState<any[]>([])
+  const [savingSettings, setSavingSettings] = useState(false)
+
   useEffect(() => {
     fetch(`/api/programs/${id}`)
       .then((r) => r.json())
-      .then((d) => { setProgram(d); setLoading(false) })
+      .then((d) => {
+        setProgram(d)
+        setSettingsForm({
+          tiersEnabled: d.tiersEnabled ?? false,
+          webhookUrl: d.webhookUrl ?? "",
+          customDomain: d.customDomain ?? "",
+        })
+        setTiers(d.commissionTiers ?? [])
+        setLoading(false)
+      })
   }, [id])
 
   async function updateMembership(memberId: string, status: string, customRate?: string) {
@@ -44,22 +59,72 @@ export default function ProgramDetailPage() {
     setUpdating(null)
   }
 
+  async function saveSettings() {
+    setSavingSettings(true)
+    await fetch(`/api/programs/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...settingsForm,
+        tiers,
+      }),
+    })
+    const updated = await fetch(`/api/programs/${id}`).then((r) => r.json())
+    setProgram(updated)
+    setTiers(updated.commissionTiers ?? [])
+    setSavingSettings(false)
+    setEditingSettings(false)
+  }
+
+  function addTier() {
+    setTiers((prev: any[]) => [...prev, { minSales: "", rate: "" }])
+  }
+
+  function removeTier(idx: number) {
+    setTiers((prev: any[]) => prev.filter((_, i) => i !== idx))
+  }
+
+  function updateTier(idx: number, key: string, value: string) {
+    setTiers((prev: any[]) => prev.map((t, i) => i === idx ? { ...t, [key]: value } : t))
+  }
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://affiliatehide.com"
+
   if (loading) return <DashboardLayout navItems={navItems} title="Company Dashboard"><div className="text-gray-500 text-center py-16">Loading...</div></DashboardLayout>
   if (!program) return <DashboardLayout navItems={navItems} title="Company Dashboard"><div className="text-red-400 text-center py-16">Program not found</div></DashboardLayout>
 
   const pending = program.memberships.filter((m: any) => m.status === "pending")
   const approved = program.memberships.filter((m: any) => m.status === "approved")
 
+  const inputClass = "w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-600 transition-colors"
+
   return (
     <DashboardLayout navItems={navItems} title="Company Dashboard">
       <div className="max-w-5xl mx-auto">
         <div className="mb-6">
           <Link href="/dashboard/company/programs" className="text-gray-400 text-sm hover:text-white">← Back to Programs</Link>
-          <div className="flex items-center gap-3 mt-2">
-            <h1 className="text-2xl font-bold text-white">{program.name}</h1>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${program.isActive ? "bg-green-500/10 text-green-400" : "bg-gray-700 text-gray-400"}`}>
-              {program.isActive ? "Active" : "Paused"}
-            </span>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-white">{program.name}</h1>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${program.isActive ? "bg-green-500/10 text-green-400" : "bg-gray-700 text-gray-400"}`}>
+                {program.isActive ? "Active" : "Paused"}
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <Link
+                href={`/dashboard/company/programs/${id}/leaderboard`}
+                className="text-sm text-yellow-400 hover:text-yellow-300 border border-yellow-500/30 bg-yellow-500/10 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                🏆 Leaderboard
+              </Link>
+              <Link
+                href={`/programs/${program.slug}`}
+                target="_blank"
+                className="text-sm text-blue-400 hover:text-blue-300 border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                🌐 Public Page
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -84,16 +149,137 @@ export default function ProgramDetailPage() {
             <div>
               <p className="text-gray-400 text-xs mb-1">Postback URL (server-side conversion tracking)</p>
               <code className="bg-gray-800 text-green-400 text-xs px-3 py-2 rounded-lg block break-all">
-                {typeof window !== "undefined" ? window.location.origin : ""}/api/postback?token={program.conversionToken}&amount=AMOUNT
+                {origin}/api/postback?token={program.conversionToken}&amount=AMOUNT
               </code>
             </div>
             <div>
               <p className="text-gray-400 text-xs mb-1">Pixel URL (add to thank-you page)</p>
               <code className="bg-gray-800 text-green-400 text-xs px-3 py-2 rounded-lg block break-all">
-                &lt;img src="{typeof window !== "undefined" ? window.location.origin : ""}/api/pixel/CODE.gif" width="1" height="1" /&gt;
+                &lt;img src="{origin}/api/pixel/CODE.gif" width="1" height="1" /&gt;
               </code>
             </div>
           </div>
+        </div>
+
+        {/* Advanced Settings */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white font-semibold">Advanced Settings</h2>
+            <button
+              onClick={() => setEditingSettings(!editingSettings)}
+              className="text-sm text-red-400 hover:text-red-300"
+            >
+              {editingSettings ? "Cancel" : "Edit"}
+            </button>
+          </div>
+
+          {editingSettings ? (
+            <div className="space-y-5">
+              {/* Webhook URL */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Webhook URL (Pro plan)</label>
+                <input
+                  type="url"
+                  value={settingsForm.webhookUrl}
+                  onChange={(e) => setSettingsForm((f: any) => ({ ...f, webhookUrl: e.target.value }))}
+                  className={inputClass}
+                  placeholder="https://yoursite.com/webhooks/conversions"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Receive a POST request on every confirmed conversion (Pro plan only).
+                </p>
+              </div>
+
+              {/* Custom Domain */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Custom Domain (Pro plan)</label>
+                <input
+                  type="text"
+                  value={settingsForm.customDomain}
+                  onChange={(e) => setSettingsForm((f: any) => ({ ...f, customDomain: e.target.value }))}
+                  className={inputClass}
+                  placeholder="links.yoursite.com"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Affiliate links will display as <code className="text-gray-400">[customDomain]/r/[code]</code>.
+                  Add a CNAME record pointing to <code className="text-gray-400">affiliatehide.com</code>.
+                </p>
+              </div>
+
+              {/* Commission Tiers */}
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <label className="text-sm text-gray-400">Commission Tiers</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div
+                      onClick={() => setSettingsForm((f: any) => ({ ...f, tiersEnabled: !f.tiersEnabled }))}
+                      className={`w-9 h-5 rounded-full transition-colors relative ${settingsForm.tiersEnabled ? "bg-red-600" : "bg-gray-700"}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${settingsForm.tiersEnabled ? "translate-x-4" : ""}`} />
+                    </div>
+                    <span className="text-xs text-gray-400">{settingsForm.tiersEnabled ? "Enabled" : "Disabled"}</span>
+                  </label>
+                </div>
+
+                {settingsForm.tiersEnabled && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-5 gap-2 text-xs text-gray-500 mb-1">
+                      <span className="col-span-2">Min. Total Sales ($)</span>
+                      <span className="col-span-2">Commission Rate</span>
+                      <span />
+                    </div>
+                    {tiers.map((tier: any, idx: number) => (
+                      <div key={idx} className="grid grid-cols-5 gap-2">
+                        <input
+                          type="number"
+                          value={tier.minSales}
+                          onChange={(e) => updateTier(idx, "minSales", e.target.value)}
+                          className="col-span-2 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-600"
+                          placeholder="500"
+                          min="0"
+                        />
+                        <input
+                          type="number"
+                          value={tier.rate}
+                          onChange={(e) => updateTier(idx, "rate", e.target.value)}
+                          className="col-span-2 bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-600"
+                          placeholder="15"
+                          min="0"
+                          step="0.01"
+                        />
+                        <button
+                          onClick={() => removeTier(idx)}
+                          className="text-red-400 hover:text-red-300 text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={addTier}
+                      className="text-sm text-green-400 hover:text-green-300 mt-2"
+                    >
+                      + Add Tier
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={saveSettings}
+                disabled={savingSettings}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-semibold"
+              >
+                {savingSettings ? "Saving..." : "Save Settings"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2 text-sm text-gray-400">
+              <p>Webhook: {program.webhookUrl || <span className="text-gray-600">Not set</span>}</p>
+              <p>Custom domain: {program.customDomain || <span className="text-gray-600">Not set</span>}</p>
+              <p>Commission tiers: {program.tiersEnabled ? <span className="text-green-400">Enabled ({(program.commissionTiers ?? []).length} tiers)</span> : "Disabled"}</p>
+            </div>
+          )}
         </div>
 
         {/* Pending applications */}
@@ -143,11 +329,19 @@ export default function ProgramDetailPage() {
               {approved.map((m: any) => {
                 const totalClicks = m.links.reduce((s: number, l: any) => s + l._count.clicks, 0)
                 const totalConversions = m.links.reduce((s: number, l: any) => s + l._count.conversions, 0)
+                // Show affiliate link with custom domain if set
+                const domain = program.customDomain
+                  ? program.customDomain
+                  : (typeof window !== "undefined" ? window.location.host : "affiliatehide.com")
+                const sampleLink = m.links[0]?.code ? `${domain.startsWith("http") ? "" : "https://"}${domain}/r/${m.links[0].code}` : null
                 return (
                   <div key={m.id} className="px-6 py-4 flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-white text-sm font-medium truncate">{m.affiliate.name ?? m.affiliate.email}</p>
                       <p className="text-gray-500 text-xs">{m.affiliate.email} · PayPal: {m.affiliate.paypalEmail ?? "not set"}</p>
+                      {sampleLink && (
+                        <p className="text-gray-600 text-xs mt-0.5 font-mono truncate">{sampleLink}</p>
+                      )}
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-white text-sm">{totalClicks} clicks · {totalConversions} conversions</p>

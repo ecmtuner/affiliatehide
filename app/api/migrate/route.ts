@@ -20,6 +20,7 @@ export async function GET() {
       "stripeCustomerId" TEXT,
       "stripeSubscriptionId" TEXT,
       "paypalEmail" TEXT,
+      "referredBy" TEXT,
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS "Program" (
@@ -37,6 +38,16 @@ export async function GET() {
       "isActive" BOOLEAN NOT NULL DEFAULT true,
       "conversionToken" TEXT UNIQUE NOT NULL,
       "payoutThreshold" FLOAT NOT NULL DEFAULT 50,
+      "tiersEnabled" BOOLEAN NOT NULL DEFAULT false,
+      "webhookUrl" TEXT,
+      "customDomain" TEXT,
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS "CommissionTier" (
+      id TEXT PRIMARY KEY,
+      "programId" TEXT NOT NULL REFERENCES "Program"(id),
+      "minSales" FLOAT NOT NULL,
+      rate FLOAT NOT NULL,
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS "AffiliateMembership" (
@@ -53,6 +64,7 @@ export async function GET() {
       "membershipId" TEXT NOT NULL REFERENCES "AffiliateMembership"(id),
       code TEXT UNIQUE NOT NULL,
       "destinationUrl" TEXT NOT NULL,
+      "expiresAt" TIMESTAMP WITH TIME ZONE,
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS "Click" (
@@ -61,6 +73,7 @@ export async function GET() {
       ip TEXT,
       "userAgent" TEXT,
       referrer TEXT,
+      "isDuplicate" BOOLEAN NOT NULL DEFAULT false,
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS "Conversion" (
@@ -80,7 +93,16 @@ export async function GET() {
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "paypalEmail" TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS plan TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "referredBy" TEXT`,
     `ALTER TABLE "Program" ADD COLUMN IF NOT EXISTS "payoutThreshold" FLOAT DEFAULT 50`,
+    `ALTER TABLE "Program" ADD COLUMN IF NOT EXISTS "tiersEnabled" BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE "Program" ADD COLUMN IF NOT EXISTS "webhookUrl" TEXT`,
+    `ALTER TABLE "Program" ADD COLUMN IF NOT EXISTS "customDomain" TEXT`,
+    `ALTER TABLE "Link" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP WITH TIME ZONE`,
+    `ALTER TABLE "Click" ADD COLUMN IF NOT EXISTS "isDuplicate" BOOLEAN NOT NULL DEFAULT false`,
   ]
 
   for (const sql of statements) {

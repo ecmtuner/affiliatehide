@@ -18,6 +18,7 @@ export default function AffiliateDashboard() {
   const router = useRouter()
   const [memberships, setMemberships] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [referralCopied, setReferralCopied] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login")
@@ -32,6 +33,18 @@ export default function AffiliateDashboard() {
   const totalClicks = memberships.flatMap((m) => m.links ?? []).reduce((s: number, l: any) => s + (l._count?.clicks ?? 0), 0)
   const totalConversions = memberships.flatMap((m) => m.links ?? []).reduce((s: number, l: any) => s + (l._count?.conversions ?? 0), 0)
   const approved = memberships.filter((m) => m.status === "approved").length
+
+  const userId = (session?.user as any)?.id
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://affiliatehide.com"
+  const referralLink = userId ? `${origin}/signup?ref=${userId}` : ""
+
+  function copyReferral() {
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink)
+      setReferralCopied(true)
+      setTimeout(() => setReferralCopied(false), 2000)
+    }
+  }
 
   return (
     <DashboardLayout navItems={navItems} title="Affiliate Dashboard">
@@ -55,7 +68,7 @@ export default function AffiliateDashboard() {
           ))}
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
           {[
             { title: "Browse Programs", desc: "Find programs to join and start earning commissions.", href: "/dashboard/affiliate/programs", label: "Browse Programs" },
             { title: "My Links", desc: "View your tracking links and generate deep links.", href: "/dashboard/affiliate/links", label: "View Links" },
@@ -69,6 +82,31 @@ export default function AffiliateDashboard() {
             </div>
           ))}
         </div>
+
+        {/* Referral Program */}
+        {userId && (
+          <div className="bg-gray-900 border border-purple-600/20 rounded-xl p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-white font-semibold mb-1">🎁 Refer other affiliates</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Earn <strong className="text-purple-400">10% of their first month's subscription</strong> when someone you refer signs up as a company.
+                </p>
+                <div className="flex items-center gap-3">
+                  <code className="bg-gray-800 text-purple-300 text-xs px-3 py-2 rounded-lg truncate max-w-xs">
+                    {referralLink}
+                  </code>
+                  <button
+                    onClick={copyReferral}
+                    className="text-xs text-gray-400 hover:text-white flex-shrink-0 transition-colors"
+                  >
+                    {referralCopied ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   )

@@ -19,6 +19,7 @@ model User {
   stripeCustomerId     String?
   stripeSubscriptionId String?
   paypalEmail          String?
+  referredBy           String?
   createdAt            DateTime             @default(now())
   programs             Program[]
   memberships          AffiliateMembership[]
@@ -40,10 +41,23 @@ model Program {
   isActive         Boolean              @default(true)
   conversionToken  String               @unique
   payoutThreshold  Float                @default(50)
+  tiersEnabled     Boolean              @default(false)
+  webhookUrl       String?
+  customDomain     String?
   createdAt        DateTime             @default(now())
   company          User                 @relation(fields: [companyId], references: [id])
   memberships      AffiliateMembership[]
   payouts          Payout[]
+  commissionTiers  CommissionTier[]
+}
+
+model CommissionTier {
+  id        String   @id @default(cuid())
+  programId String
+  minSales  Float
+  rate      Float
+  createdAt DateTime @default(now())
+  program   Program  @relation(fields: [programId], references: [id])
 }
 
 model AffiliateMembership {
@@ -65,6 +79,7 @@ model Link {
   membershipId   String
   code           String              @unique
   destinationUrl String
+  expiresAt      DateTime?
   createdAt      DateTime            @default(now())
   membership     AffiliateMembership @relation(fields: [membershipId], references: [id])
   clicks         Click[]
@@ -72,13 +87,14 @@ model Link {
 }
 
 model Click {
-  id        String   @id @default(cuid())
-  linkId    String
-  ip        String?
-  userAgent String?
-  referrer  String?
-  createdAt DateTime @default(now())
-  link      Link     @relation(fields: [linkId], references: [id])
+  id          String   @id @default(cuid())
+  linkId      String
+  ip          String?
+  userAgent   String?
+  referrer    String?
+  isDuplicate Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  link        Link     @relation(fields: [linkId], references: [id])
 }
 
 model Conversion {

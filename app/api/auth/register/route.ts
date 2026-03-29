@@ -7,7 +7,7 @@ const genId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 25)
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, role } = await req.json()
+    const { name, email, password, role, referredBy } = await req.json()
 
     if (!email || !password || !role) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -22,6 +22,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email already in use" }, { status: 400 })
     }
 
+    // Validate referredBy if provided
+    let validReferredBy: string | null = null
+    if (referredBy) {
+      const referrer = await prisma.user.findUnique({ where: { id: referredBy } })
+      if (referrer) validReferredBy = referredBy
+    }
+
     const hashed = await bcrypt.hash(password, 10)
     const user = await prisma.user.create({
       data: {
@@ -30,6 +37,7 @@ export async function POST(req: NextRequest) {
         name,
         password: hashed,
         role: role || "affiliate",
+        referredBy: validReferredBy,
       },
     })
 

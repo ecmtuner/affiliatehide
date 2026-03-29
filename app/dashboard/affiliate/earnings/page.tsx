@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
+import Link from "next/link"
 import { DashboardLayout } from "@/components/DashboardLayout"
 
 const navItems = [
@@ -11,11 +13,14 @@ const navItems = [
 ]
 
 export default function EarningsPage() {
+  const { data: session } = useSession()
   const [payouts, setPayouts] = useState<any[]>([])
+  const [user, setUser] = useState<any>(null)
   const [paypalEmail, setPaypalEmail] = useState("")
   const [editingPaypal, setEditingPaypal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [referralCopied, setReferralCopied] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -23,6 +28,7 @@ export default function EarningsPage() {
       fetch("/api/user").then((r) => r.json()),
     ]).then(([p, u]) => {
       setPayouts(Array.isArray(p) ? p : [])
+      setUser(u)
       setPaypalEmail(u.paypalEmail ?? "")
       setLoading(false)
     })
@@ -42,6 +48,18 @@ export default function EarningsPage() {
   const total = payouts.reduce((s, p) => s + p.amount, 0)
   const pending = payouts.filter((p) => p.status === "pending").reduce((s, p) => s + p.amount, 0)
   const paid = payouts.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0)
+
+  const userId = user?.id
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://affiliatehide.com"
+  const referralLink = userId ? `${origin}/signup?ref=${userId}` : ""
+
+  function copyReferral() {
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink)
+      setReferralCopied(true)
+      setTimeout(() => setReferralCopied(false), 2000)
+    }
+  }
 
   return (
     <DashboardLayout navItems={navItems} title="Affiliate Dashboard">
@@ -91,6 +109,39 @@ export default function EarningsPage() {
             </div>
           ))}
         </div>
+
+        {/* Referral Section */}
+        {userId && (
+          <div className="bg-gray-900 border border-purple-600/20 rounded-xl p-6 mb-6">
+            <h2 className="text-white font-semibold mb-1">🎁 Affiliate Referral Program</h2>
+            <p className="text-gray-400 text-sm mb-4">
+              Refer other affiliates and earn <strong className="text-purple-400">10% of their first month's subscription</strong> when they bring on a paying company.
+            </p>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-gray-800 rounded-xl p-4">
+                <p className="text-gray-400 text-xs mb-1">Referred Affiliates</p>
+                <p className="text-white text-2xl font-bold">{user?.referredCount ?? 0}</p>
+              </div>
+              <div className="bg-gray-800 rounded-xl p-4">
+                <p className="text-gray-400 text-xs mb-1">Pending Bonus</p>
+                <p className="text-purple-400 text-2xl font-bold">$—</p>
+                <p className="text-gray-600 text-xs">Tracked when referred user subscribes</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <p className="text-gray-400 text-sm flex-shrink-0">Your referral link:</p>
+              <code className="bg-gray-800 text-purple-300 text-xs px-3 py-2 rounded-lg truncate flex-1 min-w-0">
+                {referralLink}
+              </code>
+              <button
+                onClick={copyReferral}
+                className="text-xs text-gray-400 hover:text-white flex-shrink-0 transition-colors"
+              >
+                {referralCopied ? "✓ Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* History */}
         {loading ? (

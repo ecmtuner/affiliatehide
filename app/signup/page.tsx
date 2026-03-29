@@ -1,18 +1,30 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [role, setRole] = useState<"company" | "affiliate">("affiliate")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  // Pre-fill role from query param and track programSlug for post-signup redirect
+  const programSlug = searchParams.get("programSlug")
+  const refUserId = searchParams.get("ref")
+
+  useEffect(() => {
+    const roleParam = searchParams.get("role")
+    if (roleParam === "company" || roleParam === "affiliate") {
+      setRole(roleParam)
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -22,7 +34,7 @@ export default function SignupPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password, role, referredBy: refUserId }),
     })
 
     const data = await res.json()
@@ -45,7 +57,20 @@ export default function SignupPage() {
       return
     }
 
-    router.push(role === "company" ? "/dashboard/company" : "/dashboard/affiliate")
+    if (role === "affiliate" && programSlug) {
+      // Apply to the program after signup
+      const prog = await fetch("/api/programs/public/" + programSlug).then((r) => r.json()).catch(() => null)
+      if (prog?.id) {
+        await fetch("/api/memberships", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ programId: prog.id }),
+        }).catch(() => {})
+      }
+      router.push("/dashboard/affiliate/programs")
+    } else {
+      router.push(role === "company" ? "/dashboard/company" : "/dashboard/affiliate")
+    }
   }
 
   return (
@@ -58,6 +83,16 @@ export default function SignupPage() {
           </Link>
           <h1 className="text-2xl font-bold text-white mt-4">Create your account</h1>
           <p className="text-gray-400 mt-1 text-sm">Start tracking affiliates in minutes</p>
+          {programSlug && (
+            <p className="text-green-400 text-sm mt-2">
+              You're signing up to join the <strong>{programSlug}</strong> affiliate program
+            </p>
+          )}
+          {refUserId && (
+            <p className="text-blue-400 text-sm mt-2">
+              You were referred by a friend — welcome! 🎉
+            </p>
+          )}
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">
@@ -162,5 +197,13 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   )
 }

@@ -14,6 +14,7 @@ export default function LinksPage() {
   const [memberships, setMemberships] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [deepLinkUrl, setDeepLinkUrl] = useState("")
+  const [expiresAt, setExpiresAt] = useState("")
   const [selectedMembershipId, setSelectedMembershipId] = useState("")
   const [generatedLink, setGeneratedLink] = useState("")
   const [generating, setGenerating] = useState(false)
@@ -33,14 +34,24 @@ export default function LinksPage() {
   async function generateDeepLink() {
     if (!selectedMembershipId || !deepLinkUrl) return
     setGenerating(true)
+    const body: any = { membershipId: selectedMembershipId, destinationUrl: deepLinkUrl }
+    if (expiresAt) body.expiresAt = new Date(expiresAt).toISOString()
+
     const res = await fetch("/api/links", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ membershipId: selectedMembershipId, destinationUrl: deepLinkUrl }),
+      body: JSON.stringify(body),
     })
     const data = await res.json()
     if (res.ok) {
-      setGeneratedLink(`${window.location.origin}/r/${data.code}`)
+      const origin = window.location.origin
+      // Show with custom domain if available
+      const membership = memberships.find((m) => m.id === selectedMembershipId)
+      const customDomain = membership?.program?.customDomain
+      const base = customDomain
+        ? `https://${customDomain}`
+        : origin
+      setGeneratedLink(`${base}/r/${data.code}`)
       setMemberships((prev) =>
         prev.map((m) =>
           m.id === selectedMembershipId
@@ -59,6 +70,12 @@ export default function LinksPage() {
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : ""
+
+  function getLinkUrl(link: any, membership: any) {
+    const customDomain = membership?.program?.customDomain
+    if (customDomain) return `https://${customDomain}/r/${link.code}`
+    return `${origin}/r/${link.code}`
+  }
 
   return (
     <DashboardLayout navItems={navItems} title="Affiliate Dashboard">
@@ -91,6 +108,18 @@ export default function LinksPage() {
                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-600"
                 placeholder="https://example.com/product/123"
               />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">
+                Expiry Date <span className="text-gray-600">(optional)</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-600"
+              />
+              <p className="text-xs text-gray-600 mt-1">If set, link redirects to program website with ?expired=1 after this date.</p>
             </div>
             <button
               onClick={generateDeepLink}
@@ -127,29 +156,44 @@ export default function LinksPage() {
               <div key={m.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-800">
                   <h3 className="text-white font-semibold">{m.program?.name}</h3>
+                  {m.program?.customDomain && (
+                    <p className="text-xs text-blue-400 mt-0.5">Custom domain: {m.program.customDomain}</p>
+                  )}
                 </div>
                 {(m.links ?? []).length === 0 ? (
                   <div className="px-6 py-4 text-gray-500 text-sm">No links yet</div>
                 ) : (
                   <div className="divide-y divide-gray-800">
-                    {m.links.map((link: any) => (
-                      <div key={link.id} className="px-6 py-4">
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <code className="text-red-400 text-sm">{origin}/r/{link.code}</code>
-                          <button
-                            onClick={() => copy(`${origin}/r/${link.code}`)}
-                            className="text-xs text-gray-400 hover:text-white transition-colors flex-shrink-0"
-                          >
-                            {copied === `${origin}/r/${link.code}` ? "✓ Copied" : "Copy"}
-                          </button>
+                    {m.links.map((link: any) => {
+                      const linkUrl = getLinkUrl(link, m)
+                      const isExpired = link.expiresAt && new Date(link.expiresAt) < new Date()
+                      return (
+                        <div key={link.id} className="px-6 py-4">
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <code className="text-red-400 text-sm truncate">{linkUrl}</code>
+                              {isExpired && (
+                                <span className="text-xs bg-orange-500/10 text-orange-400 px-1.5 py-0.5 rounded flex-shrink-0">Expired</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => copy(linkUrl)}
+                              className="text-xs text-gray-400 hover:text-white transition-colors flex-shrink-0"
+                            >
+                              {copied === linkUrl ? "✓ Copied" : "Copy"}
+                            </button>
+                          </div>
+                          <p className="text-gray-500 text-xs truncate">{link.destinationUrl}</p>
+                          <div className="flex gap-4 mt-2 text-xs text-gray-400">
+                            <span>{link._count?.clicks ?? 0} clicks</span>
+                            <span>{link._count?.conversions ?? 0} conversions</span>
+                            {link.expiresAt && (
+                              <span>Expires: {new Date(link.expiresAt).toLocaleDateString()}</span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-gray-500 text-xs truncate">{link.destinationUrl}</p>
-                        <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                          <span>{link._count?.clicks ?? 0} clicks</span>
-                          <span>{link._count?.conversions ?? 0} conversions</span>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
