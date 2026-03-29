@@ -36,7 +36,7 @@ export default function LandingPage() {
               View Pricing
             </Link>
           </div>
-          <p className="text-gray-500 text-sm mt-4">No credit card required · Cancel anytime</p>
+          <p className="text-gray-500 text-sm mt-4">7-day free trial · Card required · Cancel anytime</p>
         </div>
       </section>
 
@@ -264,7 +264,7 @@ export default function LandingPage() {
               },
               {
                 q: "Is there a free trial?",
-                a: "All plans start with a 7-day free trial. No credit card required.",
+                a: "All plans start with a 7-day free trial. Card required. Auto-billed after trial ends.",
               },
             ].map((item) => (
               <details key={item.q} className="bg-gray-900 border border-gray-800 rounded-xl group">
