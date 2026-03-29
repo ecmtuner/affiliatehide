@@ -1,0 +1,103 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../generated/prisma"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String               @id @default(cuid())
+  email                String               @unique
+  password             String?
+  name                 String?
+  role                 String               @default("affiliate")
+  plan                 String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  paypalEmail          String?
+  createdAt            DateTime             @default(now())
+  programs             Program[]
+  memberships          AffiliateMembership[]
+  payouts              Payout[]
+}
+
+model Program {
+  id               String               @id @default(cuid())
+  companyId        String
+  name             String
+  slug             String               @unique
+  description      String?
+  websiteUrl       String
+  logoUrl          String?
+  baseRate         Float                @default(10)
+  rateType         String               @default("percent")
+  cookieDays       Int                  @default(30)
+  autoApprove      Boolean              @default(false)
+  isActive         Boolean              @default(true)
+  conversionToken  String               @unique
+  payoutThreshold  Float                @default(50)
+  createdAt        DateTime             @default(now())
+  company          User                 @relation(fields: [companyId], references: [id])
+  memberships      AffiliateMembership[]
+  payouts          Payout[]
+}
+
+model AffiliateMembership {
+  id          String    @id @default(cuid())
+  affiliateId String
+  programId   String
+  status      String    @default("pending")
+  customRate  Float?
+  joinedAt    DateTime  @default(now())
+  affiliate   User      @relation(fields: [affiliateId], references: [id])
+  program     Program   @relation(fields: [programId], references: [id])
+  links       Link[]
+
+  @@unique([affiliateId, programId])
+}
+
+model Link {
+  id             String              @id @default(cuid())
+  membershipId   String
+  code           String              @unique
+  destinationUrl String
+  createdAt      DateTime            @default(now())
+  membership     AffiliateMembership @relation(fields: [membershipId], references: [id])
+  clicks         Click[]
+  conversions    Conversion[]
+}
+
+model Click {
+  id        String   @id @default(cuid())
+  linkId    String
+  ip        String?
+  userAgent String?
+  referrer  String?
+  createdAt DateTime @default(now())
+  link      Link     @relation(fields: [linkId], references: [id])
+}
+
+model Conversion {
+  id        String   @id @default(cuid())
+  linkId    String
+  amount    Float    @default(0)
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  link      Link     @relation(fields: [linkId], references: [id])
+}
+
+model Payout {
+  id          String    @id @default(cuid())
+  affiliateId String
+  programId   String
+  amount      Float
+  status      String    @default("pending")
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+  affiliate   User      @relation(fields: [affiliateId], references: [id])
+  program     Program   @relation(fields: [programId], references: [id])
+}
