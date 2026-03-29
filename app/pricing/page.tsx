@@ -105,7 +105,7 @@ export default function PricingPage() {
                     : "border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white"
                 }`}
               >
-                Get Started
+                Start 7-Day Free Trial
               </Link>
             </div>
           ))}

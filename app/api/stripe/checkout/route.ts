@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: planConfig.priceId, quantity: 1 }],
+    subscription_data: {
+      trial_period_days: 7,
+    },
     success_url: `${process.env.NEXTAUTH_URL}/dashboard/company?subscribed=1`,
     cancel_url: `${process.env.NEXTAUTH_URL}/pricing`,
     metadata: { userId, plan },

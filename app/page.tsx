@@ -27,7 +27,7 @@ export default function LandingPage() {
               href="/signup"
               className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-colors"
             >
-              Start Free Trial
+              Start 7-Day Free Trial
             </Link>
             <Link
               href="/pricing"
@@ -36,6 +36,7 @@ export default function LandingPage() {
               View Pricing
             </Link>
           </div>
+          <p className="text-gray-500 text-sm mt-4">No credit card required · Cancel anytime</p>
         </div>
       </section>
 
@@ -192,7 +193,7 @@ export default function LandingPage() {
                       : "border border-gray-700 hover:border-gray-500 text-gray-300"
                   }`}
                 >
-                  Get Started
+                  Start 7-Day Free Trial
                 </Link>
               </div>
             ))}
@@ -263,7 +264,7 @@ export default function LandingPage() {
               },
               {
                 q: "Is there a free trial?",
-                a: "All plans start with a 14-day free trial. No credit card required.",
+                a: "All plans start with a 7-day free trial. No credit card required.",
               },
             ].map((item) => (
               <details key={item.q} className="bg-gray-900 border border-gray-800 rounded-xl group">
